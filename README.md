@@ -21,9 +21,8 @@ OrbitGuard AI is a smart satellite tracking and monitoring agent that:
 
 ---
 
-## 📸 Demo
+## 📸 
 
-![OrbitGuard AI Interface](docs/screenshot.png)
 
 ---
 
