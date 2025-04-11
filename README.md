@@ -21,7 +21,7 @@ OrbitGuard AI is a smart satellite tracking and monitoring agent that:
 
 ---
 
-## 📸 
+## 📸 Demo Screenshot as PDF
 https://github.com/recepsuluker/OrbitGuardAI/blob/main/OrbitGuard%20AI.pdf
 
 ---
@@ -48,11 +48,11 @@ streamlit run app.py
 
 ## 🧠 Usage
 
-1. Enter your Space-Track credentials (free registration required)
+1. Enter your Space-Track credentials (free registration required) - https://www.space-track.org/auth/login
 2. Input at least 5 NORAD IDs (e.g., `52739,55012,56210,58256,58268`)
 3. Set your **base station** location (lat/lon/elevation)
 4. Click `🚀 Run Full Analysis`
-5. View 2D/3D satellite maps and download CSV reports
+5. View 2D/3D satellite maps in Streamlit interface and download CSV reports
 
 ---
 
@@ -79,7 +79,7 @@ OrbitGuardAI/
 
 ## 👨‍💻 Credits
 
-Developed by [Your Name] – inspired by Plan-S satellite data tracking and real-time LEO traffic analysis.
+Developed by Recep Suluker – testing by 5 Active satellite of Plan-S to data tracking and real-time LEO traffic analysis.
 
 ---
 
