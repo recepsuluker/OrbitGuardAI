@@ -35,6 +35,16 @@ maturin>=1.4.0
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 
+# === NEW: Step 2 - FastAPI Backend ===
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+websockets>=12.0
+
+# === NEW: Step 3 - Database & Scheduling ===
+apscheduler>=3.10.0
+schedule>=1.2.0
+sqlalchemy>=2.0.0  # Optional: for advanced ORM
+
 # Optional: For advanced features
 # scipy>=1.10.0
-# sqlalchemy>=2.0.0
