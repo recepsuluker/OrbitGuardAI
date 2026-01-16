@@ -39,7 +39,7 @@ st.set_page_config(
 # Session State Initialization
 # =============================================================================
 if 'theme' not in st.session_state:
-    st.session_state.theme = "nadir"  # Default to Nadir theme per request
+    st.session_state.theme = "light"  # Default to Light theme per request
 if 'custom_theme_data' not in st.session_state:
     st.session_state.custom_theme_data = None
 if 'view_mode' not in st.session_state:

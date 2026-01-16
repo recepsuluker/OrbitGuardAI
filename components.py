@@ -156,9 +156,9 @@ def render_theme_selector():
     st.markdown("### 🎨 Theme Settings")
     
     themes_map = {
-        "Dark Mode": "dark",
         "Light Mode": "light",
-        "Nadir.space (Gruvbox)": "nadir",
+        "Dark Mode": "dark",
+        "Gruvbox": "nadir",
         "Dracula": "dracula",
         "Solarized Dark": "solarized_dark",
         "Solarized Light": "solarized_light",
