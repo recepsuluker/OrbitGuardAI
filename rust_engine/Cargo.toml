@@ -1,0 +1,30 @@
+[package]
+name = "orbit_core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Recep Suluker <recepsuluker@example.com>"]
+description = "High-performance orbital mechanics engine for OrbitGuardAI"
+
+[lib]
+name = "orbit_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Python bindings
+pyo3 = { version = "0.20", features = ["extension-module"] }
+
+# Linear algebra for vector operations
+nalgebra = "0.32"
+
+# Parallelization
+rayon = "1.8"
+
+# Serialization (if needed)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+# Optimize for speed
+opt-level = 3
+lto = true
+codegen-units = 1
