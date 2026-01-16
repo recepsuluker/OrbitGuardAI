@@ -144,6 +144,13 @@ def render_conjunction_alert(sat1: str, sat2: str, distance_km: float,
     """, unsafe_allow_html=True)
 
 
+def render_login_button():
+    """Render login button for Space-Track credentials"""
+    if st.button("🚀 Log In", width="stretch", type="primary", key="login_btn"):
+        return True
+    return False
+
+
 def render_theme_toggle():
     """Render theme toggle in sidebar"""
     st.markdown("""
@@ -212,7 +219,7 @@ def render_data_table(df: pd.DataFrame, title: str = None):
     
     st.dataframe(
         df,
-        use_container_width=True,
+        width=None,
         hide_index=True,
     )
 
@@ -229,5 +236,5 @@ def render_download_buttons(data_dict: Dict[str, pd.DataFrame]):
                 data=csv,
                 file_name=f"{name.lower().replace(' ', '_')}.csv",
                 mime="text/csv",
-                use_container_width=True
+                width="stretch"
             )

@@ -8,8 +8,9 @@ from orbit_agent import OrbitGuardAI
 from orbit_engine import KeplerianEngine, ScientificSatellite
 from visualization import OrbitVisualizer
 from themes import inject_theme, DARK_THEME, LIGHT_THEME
+from globe_3d import create_3d_globe_html
 from components import (
-    render_header, render_stats_bar, render_view_toggle,
+    render_header, render_stats_bar, render_view_toggle, render_login_button,
     render_satellite_card, render_conjunction_alert, render_theme_toggle,
     render_loading_animation, render_empty_state, render_risk_meter,
     render_download_buttons
@@ -148,127 +149,49 @@ def create_2d_map(satellites_data, ground_station=None, theme="dark"):
     return m
 
 
-def create_3d_globe(satellites_data, nodes=None, theme="dark"):
-    """Create a 3D Pydeck globe visualization"""
+def create_3d_globe_component(satellites_data, theme="dark"):
+    """Create an interactive Three.js 3D globe"""
     
-    # Prepare satellite data
-    sat_df = pd.DataFrame(satellites_data)
-    
-    if sat_df.empty:
+    if not satellites_data:
+        print("[DEBUG] No satellite data provided to globe")
         return None
     
-    # Add color based on criticality
-    def get_color(crit):
-        if crit > 5:
-            return [255, 50, 50, 255]  # Red
-        elif crit > 2:
-            return [255, 165, 0, 255]  # Orange
-        else:
-            return [0, 212, 255, 200]  # Cyan
+    print(f"[DEBUG] Preparing {len(satellites_data)} satellites for globe")
     
-    sat_df['color'] = sat_df.get('criticality', pd.Series([0]*len(sat_df))).apply(get_color)
-    sat_df['size'] = sat_df.get('criticality', pd.Series([1]*len(sat_df))).apply(
-        lambda x: 150 if x > 5 else 80 if x > 2 else 40
-    )
-    
-    layers = []
-    
-    # Satellite points layer
-    sat_layer = pdk.Layer(
-        "ScatterplotLayer",
-        sat_df,
-        get_position=["lon", "lat"],
-        get_color="color",
-        get_radius="size",
-        radius_scale=1000,
-        radius_min_pixels=3,
-        radius_max_pixels=10,
-        pickable=True,
-        auto_highlight=True,
-    )
-    layers.append(sat_layer)
-    
-    # Orbit paths for critical satellites
-    orbit_paths = []
+    # Prepare data for Three.js
+    globe_data = []
     for sat in satellites_data:
-        if sat.get('criticality', 0) > 3 and 'path' in sat:
-            orbit_paths.append({
-                "path": [[p[1], p[0]] for p in sat['path']],  # [lon, lat]
-                "color": [255, 100, 0, 150],
-                "name": sat['name']
-            })
+        # Calculate proper altitude (orbit height above Earth surface)
+        # elevation.km can be misleading - calculate from geocentric distance
+        alt = sat.get('alt', 400)
+        
+        # Ensure altitude is reasonable (LEO: 200-2000 km)
+        if alt < 0 or alt > 50000:
+            # Use geocentric distance if available, otherwise default
+            alt = abs(alt) if alt != 0 else 400
+        
+        globe_data.append({
+            'name': sat.get('name', 'Unknown'),
+            'lat': sat.get('lat', 0),
+            'lon': sat.get('lon', 0),
+            'alt': alt,
+            'critical': sat.get('criticality', 0) > 5
+        })
+        
+        print(f"[DEBUG] Satellite: {sat.get('name', 'Unknown')}, Alt: {alt:.1f} km")
     
-    if orbit_paths:
-        path_layer = pdk.Layer(
-            "PathLayer",
-            orbit_paths,
-            get_path="path",
-            get_color="color",
-            width_min_pixels=1,
-            width_max_pixels=3,
-            pickable=True,
-        )
-        layers.append(path_layer)
+    # Generate HTML
+    html_content = create_3d_globe_html(globe_data)
     
-    # Conjunction nodes
-    if nodes:
-        node_df = pd.DataFrame(nodes)
-        if not node_df.empty:
-            node_layer = pdk.Layer(
-                "ScatterplotLayer",
-                node_df,
-                get_position=["lon", "lat"],
-                get_color=[255, 255, 0, 200],  # Yellow
-                get_radius=100000,
-                pickable=True,
-            )
-            layers.append(node_layer)
-    
-    # Background color based on theme
-    bg_color = [5, 5, 20, 255] if theme == "dark" else [240, 245, 250, 255]
-    
-    # Globe view
-    view = pdk.View(type="_GlobeView", controller=True)
-    
-    deck = pdk.Deck(
-        layers=layers,
-        views=[view],
-        initial_view_state=pdk.ViewState(
-            latitude=20,
-            longitude=0,
-            zoom=1
-        ),
-        tooltip={
-            "html": "<b>{name}</b><br/>Lat: {lat:.2f}° | Lon: {lon:.2f}°",
-            "style": {
-                "backgroundColor": "#111827",
-                "color": "white",
-                "border": "1px solid #374151",
-                "borderRadius": "8px",
-                "padding": "8px"
-            }
-        },
-        map_style=None,
-        parameters={"clearColor": bg_color}
-    )
-    
-    return deck
+    return html_content
 
 
 # =============================================================================
 # Sidebar Configuration
 # =============================================================================
 with st.sidebar:
-    # Theme Toggle
-    st.markdown("### ⚙️ Settings")
-    
-    theme_col1, theme_col2 = st.columns([3, 1])
-    with theme_col1:
-        st.markdown("**Theme**")
-    with theme_col2:
-        if st.button("🌙" if st.session_state.theme == "dark" else "☀️", key="theme_btn"):
-            st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-            st.rerun()
+    # Force dark theme (monochrome)
+    st.session_state.theme = "dark"
     
     st.divider()
     
@@ -276,6 +199,15 @@ with st.sidebar:
     with st.expander("🔐 Space-Track Credentials", expanded=False):
         username = st.text_input("Username", value="", key="st_user")
         password = st.text_input("Password", type="password", value="", key="st_pass")
+        
+        # Login button
+        if render_login_button():
+            if username and password:
+                st.success("✅ Logged in successfully!")
+                st.session_state['logged_in'] = True
+            else:
+                st.error("⚠️ Please enter both username and password")
+        
         st.caption("📡 [Register at space-track.org](https://www.space-track.org)")
     
     st.divider()
@@ -376,7 +308,41 @@ else:
 
 st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
-# View Toggle
+# View Toggle - Sleek nadir.space style
+st.markdown("""
+<div style="display: flex; justify-content: center; padding: 1rem 0;">
+    <style>
+        .view-switcher {
+            display: inline-flex;
+            background: var(--bg-secondary);
+            border-radius: 50px;
+            padding: 4px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+        .view-btn {
+            padding: 10px 28px;
+            border-radius: 46px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+        }
+        .view-btn:hover {
+            color: var(--text-primary);
+        }
+        .view-btn.active {
+            background: var(--accent-gradient);
+            color: white;
+            box-shadow: var(--glow);
+        }
+    </style>
+</div>
+""", unsafe_allow_html=True)
+
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     view_mode = st.radio(
@@ -393,7 +359,7 @@ col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     run_analysis = st.button(
         "🚀 Run Satellite Analysis",
-        use_container_width=True,
+        width="stretch",
         type="primary",
         key="run_btn"
     )
@@ -436,6 +402,11 @@ if run_analysis:
                         geocentric = sat.at(t)
                         subpoint = wgs84.subpoint(geocentric)
                         
+                        # Calculate proper altitude (geocentric distance - Earth radius)
+                        position_km = geocentric.position.km
+                        geocentric_distance = np.linalg.norm(position_km)
+                        altitude_km = geocentric_distance - 6371.0  # Earth radius
+                        
                         # Calculate orbit path
                         path = []
                         for mins in range(0, 100, 5):
@@ -451,11 +422,14 @@ if run_analysis:
                             'norad_id': sat.model.satnum,
                             'lat': subpoint.latitude.degrees,
                             'lon': subpoint.longitude.degrees,
-                            'alt': subpoint.elevation.km,
+                            'alt': altitude_km,
                             'criticality': crit,
                             'path': path
                         })
-                    except Exception:
+                        
+                        print(f"[DEBUG] {sat.name}: Alt={altitude_km:.1f} km, Lat={subpoint.latitude.degrees:.2f}, Lon={subpoint.longitude.degrees:.2f}")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to process satellite: {e}")
                         continue
                 
                 # Store in session
@@ -490,14 +464,14 @@ if st.session_state.analysis_complete and st.session_state.satellites:
         components.html(map_html, height=600)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        # 3D Pydeck Globe
+        # 3D Three.js Globe
         st.markdown('<div class="map-container">', unsafe_allow_html=True)
-        globe_3d = create_3d_globe(
+        globe_html = create_3d_globe_component(
             st.session_state.satellites,
             theme=st.session_state.theme
         )
-        if globe_3d:
-            st.pydeck_chart(globe_3d, use_container_width=True)
+        if globe_html:
+            components.html(globe_html, height=650, scrolling=False)
         else:
             render_empty_state("No satellite data for 3D visualization")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -558,7 +532,7 @@ if st.session_state.analysis_complete and st.session_state.satellites:
             sat_df.to_csv(index=False),
             "satellites.csv",
             "text/csv",
-            use_container_width=True
+            width="stretch"
         )
     
     with export_col2:
@@ -569,7 +543,7 @@ if st.session_state.analysis_complete and st.session_state.satellites:
                 warn_df.to_csv(index=False),
                 "conjunctions.csv",
                 "text/csv",
-                use_container_width=True
+                width="stretch"
             )
     
     with export_col3:
@@ -580,7 +554,7 @@ if st.session_state.analysis_complete and st.session_state.satellites:
                 pass_df.to_csv(index=False),
                 "passes.csv",
                 "text/csv",
-                use_container_width=True
+                width="stretch"
             )
 
 else:

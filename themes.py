@@ -5,20 +5,21 @@ Modern dark/light theme support with localStorage persistence
 
 DARK_THEME = {
     "name": "dark",
-    "background_primary": "#0a0a1a",
-    "background_secondary": "#12122a",
-    "background_card": "rgba(20, 20, 45, 0.8)",
-    "text_primary": "#ffffff",
-    "text_secondary": "#a0a0b0",
-    "accent_primary": "#00d4ff",
-    "accent_secondary": "#7c3aed",
-    "accent_gradient": "linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)",
-    "success": "#22c55e",
-    "warning": "#f59e0b",
-    "danger": "#ef4444",
-    "border": "rgba(255, 255, 255, 0.1)",
-    "shadow": "0 8px 32px rgba(0, 0, 0, 0.4)",
-    "glass": "backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);",
+    "background_primary": "#000000",  # Pure black
+    "background_secondary": "#0f0f0f",  # Very dark gray
+    "background_card": "rgba(20, 20, 20, 0.9)",
+    "text_primary": "#ffffff",  # Pure white
+    "text_secondary": "#a8a8a8",  # Light gray
+    "accent_primary": "#ffffff",  # White accent
+    "accent_secondary": "#cccccc",  # Light gray
+    "accent_gradient": "linear-gradient(135deg, #ffffff 0%, #888888 100%)",  # White to gray
+    "success": "#ffffff",  # White
+    "warning": "#cccccc",  # Light gray
+    "danger": "#888888",  # Medium gray
+    "border": "rgba(255, 255, 255, 0.12)",  # Subtle white border
+    "shadow": "0 8px 32px rgba(255, 255, 255, 0.05)",  # Subtle white shadow
+    "glass": "backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);",
+    "glow": "0 0 20px rgba(255, 255, 255, 0.3)",  # White glow
 }
 
 LIGHT_THEME = {
