@@ -43,7 +43,7 @@ OrbitGuard AI is a **high-performance** satellite tracking and monitoring platfo
 | 🗺️ **2D Visualization** | Interactive Folium maps with satellite tracks | ✅ Active |
 | 🌍 **3D Globe** | Three.js + Plotly 3D Earth visualization | ✅ Active |
 | 📊 **CSV/HTML Export** | Downloadable analysis reports | ✅ Active |
-| 🎨 **Dark/Light Themes** | Customizable UI themes | ✅ Active |
+| 🎨 **Theme System** | Nadir.space, Dracula, Solarized & Custom Builder | ✅ NEW |
 
 ### 🔥 Performance Optimization (Step 1) ✅
 
@@ -185,17 +185,14 @@ OrbitGuardAI/
 │   ├── orbit_engine.py             # Orbital mechanics (Keplerian)
 │   ├── visualization.py            # 2D/3D plotting
 │   ├── globe_3d.py                 # Three.js integration
-│   ├── themes.py                   # UI theme system
+│   ├── themes.py                   # UI theme system (Step 8)
 │   └── components.py               # Reusable UI components
 │
-├── ⚡ Performance Optimization
+├── ⚡ Performance Optimization (Step 1)
 │   ├── cache_manager.py            # Redis caching system
 │   ├── orbit_agent_async.py        # Async TLE fetcher
 │   ├── benchmark.py                # Performance testing
 │   └── rust_engine/                # Rust orbital calculations
-│       ├── Cargo.toml
-│       ├── src/lib.rs
-│       └── build.bat/sh
 │
 ├── 🌐 Web Backend (Step 2)
 │   ├── api_server.py               # FastAPI REST API
@@ -207,30 +204,22 @@ OrbitGuardAI/
 │   └── orbitguard.db              # SQLite database
 │
 ├── 🧪 Testing
-│   ├── tests/
-│   │   ├── test_cache.py
-│   │   ├── test_async.py
-│   │   └── test_rust.py
+│   ├── tests/                      # Pytest suite
 │   ├── pytest.ini
-│   ├── test_engine.py
-│   └── test_large_scale.py
+│   └── benchmark.py
 │
 ├── 📄 Configuration
-│   ├── requirements.txt            # Python dependencies
-│   ├── .env.example                # Environment template
+│   ├── requirements.txt
+│   ├── .env.example
 │   └── .gitignore
-│
-├── 📊 Outputs
-│   └── outputs/                    # Generated reports & maps
 │
 └── 📚 Documentation
     ├── README.md                   # This file
     └── PERFORMANCE_OPTIMIZATION.md # Setup guide
 ```
-
 ---
 
-## � Output Files
+##  Output Files
 
 | File | Description | Format |
 |------|-------------|--------|
@@ -372,6 +361,17 @@ results = db.search_satellites(query='STARLINK', country='USA', limit=100)
 stats = db.get_statistics()
 print(f"Total satellites: {stats['total_satellites']}")
 ```
+
+### Step 8: Advanced Theme System
+
+Personalize your monitoring experience with multiple built-in themes or create your own:
+
+- **Nadir.space**: Exact Gruvbox palette transition.
+- **Dracula**: High-contrast cyberpunk aesthetic.
+- **Solarized**: Scientifically balanced light/dark modes.
+- **Custom Builder**: Full control over background, accent, and text colors.
+
+Access these from the sidebar **🎨 Theme Settings** section.
 
 📖 **Full guide:** [PERFORMANCE_OPTIMIZATION.md](PERFORMANCE_OPTIMIZATION.md)
 

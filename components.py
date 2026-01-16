@@ -151,8 +151,55 @@ def render_login_button():
     return False
 
 
+def render_theme_selector():
+    """Render advanced theme selector in sidebar"""
+    st.markdown("### 🎨 Theme Settings")
+    
+    themes_map = {
+        "Dark Mode": "dark",
+        "Light Mode": "light",
+        "Nadir.space (Gruvbox)": "nadir",
+        "Dracula": "dracula",
+        "Solarized Dark": "solarized_dark",
+        "Solarized Light": "solarized_light",
+        "Custom Theme": "custom"
+    }
+    
+    selected_label = st.selectbox(
+        "Select Visual Theme",
+        options=list(themes_map.keys()),
+        index=0,
+        key="theme_selector"
+    )
+    
+    theme_key = themes_map[selected_label]
+    custom_theme = None
+    
+    if theme_key == "custom":
+        custom_theme = render_custom_theme_builder()
+        
+    return theme_key, custom_theme
+
+
+def render_custom_theme_builder():
+    """Render color pickers for custom theme creation"""
+    from themes import create_custom_theme
+    
+    st.info("🎨 Create your own OrbitGuard aesthetic")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        bg = st.color_picker("Background", "#121212")
+        text = st.color_picker("Text Color", "#ffffff")
+    with col2:
+        accent = st.color_picker("Accent", "#00d4ff")
+        success = st.color_picker("Success/Secondary", "#00ff00")
+        
+    return create_custom_theme(bg, accent, text, success=success)
+
+
 def render_theme_toggle():
-    """Render theme toggle in sidebar"""
+    """DEPRECATED: Use render_theme_selector instead"""
     st.markdown("""
         <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
             <span style="font-size: 1.2rem;">🌙</span>

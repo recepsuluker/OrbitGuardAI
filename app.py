@@ -11,7 +11,7 @@ from themes import inject_theme, DARK_THEME, LIGHT_THEME
 from globe_3d import create_3d_globe_html
 from components import (
     render_header, render_stats_bar, render_view_toggle, render_login_button,
-    render_satellite_card, render_conjunction_alert, render_theme_toggle,
+    render_satellite_card, render_conjunction_alert, render_theme_selector,
     render_loading_animation, render_empty_state, render_risk_meter,
     render_download_buttons
 )
@@ -39,7 +39,9 @@ st.set_page_config(
 # Session State Initialization
 # =============================================================================
 if 'theme' not in st.session_state:
-    st.session_state.theme = "dark"
+    st.session_state.theme = "nadir"  # Default to Nadir theme per request
+if 'custom_theme_data' not in st.session_state:
+    st.session_state.custom_theme_data = None
 if 'view_mode' not in st.session_state:
     st.session_state.view_mode = "3D"
 if 'satellites' not in st.session_state:
@@ -50,7 +52,9 @@ if 'analysis_complete' not in st.session_state:
 # =============================================================================
 # Theme Injection
 # =============================================================================
-current_theme = inject_theme(st.session_state.theme)
+# Note: Theme injection moved into the sidebar flow to handle updates properly
+# but we do an initial injection here for consistency
+current_theme = inject_theme(st.session_state.theme, st.session_state.custom_theme_data)
 
 # =============================================================================
 # Helper Functions
@@ -190,8 +194,12 @@ def create_3d_globe_component(satellites_data, theme="dark"):
 # Sidebar Configuration
 # =============================================================================
 with st.sidebar:
-    # Force dark theme (monochrome)
-    st.session_state.theme = "dark"
+    # Theme Selection
+    theme_key, custom_data = render_theme_selector()
+    if theme_key != st.session_state.theme or custom_data != st.session_state.custom_theme_data:
+        st.session_state.theme = theme_key
+        st.session_state.custom_theme_data = custom_data
+        st.rerun()
     
     st.divider()
     
