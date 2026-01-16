@@ -3,6 +3,8 @@ OrbitGuard AI - Theme System
 Modern dark/light theme support with localStorage persistence
 """
 
+from typing import Optional
+
 DARK_THEME = {
     "name": "dark",
     "background_primary": "#000000",
