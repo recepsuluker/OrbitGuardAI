@@ -315,8 +315,7 @@ class DatabaseManager:
             FROM satellites 
             WHERE country IS NOT NULL 
             GROUP BY country 
-            ORDER BY count DESC 
-            LIMIT 10
+            ORDER BY count DESC
         ''')
         top_countries = [dict(row) for row in cursor.fetchall()]
         

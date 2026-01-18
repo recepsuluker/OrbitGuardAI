@@ -225,12 +225,50 @@ with st.sidebar:
     
     st.divider()
     
-    # Advanced Filtering
-    active_filters = render_advanced_filters(st.session_state.db)
+    # 1. Quick Satellite Selection
+    st.markdown("### 🛰️ Fast Selection")
+    popular_sats = [
+        "ISS (ZARYA)", "HST", "TIANGONG", "CSS (TIANHE)",
+        "STARLINK-1007", "STARLINK-1008", "NOAA 19", "METOP-B",
+        "SENTINEL-1A", "SENTINEL-2A", "LANDSAT 8", "LANDSAT 9"
+    ]
     
-    # Live Search Result Update
+    selected_popular = st.multiselect(
+        "Popular Satellites",
+        options=popular_sats,
+        default=["ISS (ZARYA)", "HST"],
+        key="sat_select"
+    )
+    
+    custom_input = st.text_input(
+        "Custom NORAD IDs",
+        placeholder="e.g. 25544, 48274",
+        key="custom_sats"
+    )
+    
+    st.divider()
+    
+    # 2. Advanced Search (Optional)
+    with st.expander("🔍 Advanced Filtering Options", expanded=False):
+        active_filters = render_advanced_filters(st.session_state.db)
+    
+    # Live Search Logic
+    # 1. Get IDs from quick select/custom
+    quick_ids = [str(s) for s in selected_popular]
+    if custom_input:
+        quick_ids.extend([x.strip() for x in custom_input.split(',') if x.strip()])
+    
+    # 2. Get satellites from DB based on quick IDs
+    quick_results = []
+    for qid in quick_ids:
+        res = st.session_state.db.search_satellites(query=qid, limit=1)
+        if res:
+            quick_results.extend(res)
+    
+    # 3. Get satellites from advanced filters
+    advanced_results = []
     if any(active_filters.values()):
-        st.session_state.filtering_results = st.session_state.db.search_satellites(
+        advanced_results = st.session_state.db.search_satellites(
             query=active_filters.get("query"),
             country=active_filters.get("country"),
             object_type=active_filters.get("object_type"),
@@ -238,11 +276,13 @@ with st.sidebar:
             status=active_filters.get("status"),
             limit=50
         )
-    else:
-        st.session_state.filtering_results = []
-        
+    
+    # 4. Combine and unique
+    combined = {s['norad_id']: s for s in quick_results + advanced_results}.values()
+    st.session_state.filtering_results = list(combined)
+    
     if st.session_state.filtering_results:
-        st.caption(f"Found {len(st.session_state.filtering_results)} satellites matching filters.")
+        st.caption(f"Tracking {len(st.session_state.filtering_results)} satellites.")
     
     st.divider()
     
@@ -348,16 +388,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    view_mode = st.radio(
-        "Map View",
-        ["🗺️ 2D Map", "🌍 3D Globe"],
-        horizontal=True,
-        label_visibility="collapsed",
-        key="view_radio"
-    )
-    st.session_state.view_mode = "2D" if "2D" in view_mode else "3D"
+# View Toggle - Sleek space style
+st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+view_mode = render_view_toggle(st.session_state.view_mode)
+st.session_state.view_mode = view_mode
 
 # Run Analysis Button
 col1, col2, col3 = st.columns([1, 2, 1])

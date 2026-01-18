@@ -26,14 +26,15 @@ def render_stats_bar(stats: Dict):
     for i, (label, value) in enumerate(stats.items()):
         with cols[i]:
             st.markdown(f"""
-                <div class="glass-card" style="text-align: center; padding: 1rem;">
-                    <div style="font-size: 1.8rem; font-weight: 700; 
+                <div class="glass-card" style="text-align: center; padding: 1.5rem; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 120px;">
+                    <div style="font-size: 2rem; font-weight: 800; 
                          background: var(--accent-gradient); 
                          -webkit-background-clip: text; 
-                         -webkit-text-fill-color: transparent;">
+                         -webkit-text-fill-color: transparent;
+                         line-height: 1.2;">
                         {value}
                     </div>
-                    <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem;">
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">
                         {label}
                     </div>
                 </div>
@@ -42,27 +43,49 @@ def render_stats_bar(stats: Dict):
 
 def render_view_toggle(current_view: str = "3D") -> str:
     """Render 2D/3D view toggle and return selected view"""
+    st.markdown("""
+        <style>
+        .stRadio [data-testid="stWidgetLabel"] {
+            display: none;
+        }
+        .stRadio div[role="radiogroup"] {
+            justify-content: center;
+            gap: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 10px 20px;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            margin: 0 auto;
+            width: fit-content;
+        }
+        .stRadio div[role="radiogroup"] label {
+            background: transparent !important;
+            border: none !important;
+            color: rgba(255, 255, 255, 0.6) !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+        }
+        .stRadio div[role="radiogroup"] label:hover {
+            color: #fff !important;
+        }
+        .stRadio div[role="radiogroup"] label[data-selected="true"] {
+            color: #fff !important;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
-        st.markdown("""
-            <div style="display: flex; justify-content: center; margin-bottom: 1rem;">
-                <div class="view-toggle">
-                    <span class="view-toggle-btn" id="btn-2d">🗺️ 2D Map</span>
-                    <span class="view-toggle-btn active" id="btn-3d">🌍 3D Globe</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    # Use Streamlit radio as the actual toggle (styled to match)
-    selected = st.radio(
-        "View Mode",
-        ["2D Map", "3D Globe"],
-        index=0 if current_view == "2D" else 1,
-        horizontal=True,
-        label_visibility="collapsed",
-        key="view_toggle"
-    )
+        selected = st.radio(
+            "View Mode",
+            ["🗺️ 2D Map", "🌍 3D Globe"],
+            index=0 if current_view == "2D" else 1,
+            horizontal=True,
+            key="view_toggle",
+            label_visibility="collapsed"
+        )
     
     return "2D" if "2D" in selected else "3D"
 
@@ -266,12 +289,12 @@ def render_advanced_filters(db_manager) -> Dict:
     # 1. Fuzzy Search Input
     query = st.text_input("Search (Name or NORAD ID)", placeholder='e.g. "ISS" or "25544"', key="filter_query")
     
-    # Get unique countries and types from DB for dropdowns
+    # Get all countries and types from DB for dropdowns
     stats = db_manager.get_statistics()
-    top_countries = [c['country'] for c in stats.get('top_countries', [])]
-    countries = ["All"] + sorted(top_countries)
+    all_countries = [c['country'] for c in stats.get('top_countries', [])]
+    countries = ["All"] + sorted(all_countries)
     
-    obj_types = ["All"] + [t['object_type'] for t in stats.get('object_types', []) if t['object_type']]
+    obj_types = ["All"] + sorted([t['object_type'] for t in stats.get('object_types', []) if t['object_type']])
     
     # 2. Filter Grid
     col1, col2 = st.columns(2)
@@ -282,10 +305,6 @@ def render_advanced_filters(db_manager) -> Dict:
         country = st.selectbox("Country", countries, key="filter_country")
         obj_type = st.selectbox("Object Type", obj_types, key="filter_type")
         
-    # 3. Saved Filters Logic
-    st.markdown("---")
-    render_saved_filters_management()
-    
     return {
         "query": query if query else None,
         "orbit_type": orbit if orbit != "All" else None,
@@ -293,61 +312,6 @@ def render_advanced_filters(db_manager) -> Dict:
         "country": country if country != "All" else None,
         "object_type": obj_type if obj_type != "All" else None,
     }
-
-def render_saved_filters_management():
-    """UI for saving and loading filter presets"""
-    import json
-    import os
-    
-    SAVED_FILTERS_FILE = "saved_filters.json"
-    
-    # Load existing filters
-    saved_presets = {}
-    if os.path.exists(SAVED_FILTERS_FILE):
-        try:
-            with open(SAVED_FILTERS_FILE, 'r') as f:
-                saved_presets = json.load(f)
-        except:
-            saved_presets = {}
-            
-    with st.expander("💾 Saved Filters", expanded=False):
-        # Save current filter
-        new_preset_name = st.text_input("Save current filters as:", placeholder="e.g. 'Active USA LEO'")
-        if st.button("Save Preset") and new_preset_name:
-            current_filters = {
-                "query": st.session_state.get("filter_query"),
-                "orbit_type": st.session_state.get("filter_orbit"),
-                "status": st.session_state.get("filter_status"),
-                "country": st.session_state.get("filter_country"),
-                "object_type": st.session_state.get("filter_type")
-            }
-            saved_presets[new_preset_name] = current_filters
-            with open(SAVED_FILTERS_FILE, 'w') as f:
-                json.dump(saved_presets, f)
-            st.success(f"Preset '{new_preset_name}' saved!")
-            st.rerun()
-            
-        if saved_presets:
-            st.divider()
-            selected_preset = st.selectbox("Load Preset", options=["Select..."] + list(saved_presets.keys()))
-            if selected_preset != "Select...":
-                preset_data = saved_presets[selected_preset]
-                # Apply preset to session state
-                st.session_state.filter_query = preset_data.get("query", "")
-                st.session_state.filter_orbit = preset_data.get("orbit_type", "All")
-                st.session_state.filter_status = preset_data.get("status", "All")
-                st.session_state.filter_country = preset_data.get("country", "All")
-                st.session_state.filter_type = preset_data.get("object_type", "All")
-                st.info(f"Loaded '{selected_preset}'. Click apply to use.")
-                if st.button("Apply Preset"):
-                    st.rerun()
-            
-            # Delete preset
-            if selected_preset != "Select..." and st.button("🗑️ Delete Preset", type="secondary"):
-                del saved_presets[selected_preset]
-                with open(SAVED_FILTERS_FILE, 'w') as f:
-                    json.dump(saved_presets, f)
-                st.rerun()
 
 
 def render_data_table(df: pd.DataFrame, title: str = None):
