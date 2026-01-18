@@ -48,5 +48,3 @@ sqlalchemy>=2.0.0  # Optional: for advanced ORM
 
 # Optional: For advanced features
 # scipy>=1.10.0
-thefuzz>=0.19.0
-python-Levenshtein>=0.21.0

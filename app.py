@@ -13,7 +13,7 @@ from components import (
     render_header, render_stats_bar, render_view_toggle, render_login_button,
     render_satellite_card, render_conjunction_alert, render_theme_selector,
     render_loading_animation, render_empty_state, render_risk_meter,
-    render_download_buttons, render_advanced_filters
+    render_download_buttons
 )
 from database_manager import DatabaseManager
 from skyfield.api import wgs84, load
@@ -225,62 +225,37 @@ with st.sidebar:
     
     st.divider()
     
-    # 1. Quick Satellite Selection
-    st.markdown("### 🛰️ Fast Selection")
+    # Satellite Selection
+    st.markdown("### 🛰️ Satellites")
     popular_sats = [
         "ISS (ZARYA)", "HST", "TIANGONG", "CSS (TIANHE)",
-        "STARLINK-1007", "STARLINK-1008", "NOAA 19", "METOP-B",
-        "SENTINEL-1A", "SENTINEL-2A", "LANDSAT 8", "LANDSAT 9"
+        "STARLINK-1007", "STARLINK-1008", "NOAA 19", "METOP-B"
     ]
     
-    selected_popular = st.multiselect(
-        "Popular Satellites",
+    selected_sats = st.multiselect(
+        "Select Satellites",
         options=popular_sats,
-        default=["ISS (ZARYA)", "HST"],
-        key="sat_select"
+        default=["ISS (ZARYA)", "HST"]
     )
     
-    custom_input = st.text_input(
+    custom_ids = st.text_input(
         "Custom NORAD IDs",
         placeholder="e.g. 25544, 48274",
-        key="custom_sats"
+        help="Comma-separated NORAD IDs"
     )
     
-    st.divider()
+    # Process identifiers
+    identifiers = [s for s in selected_sats]
+    if custom_ids:
+        identifiers.extend([i.strip() for i in custom_ids.split(",") if i.strip()])
     
-    # 2. Advanced Search (Optional)
-    with st.expander("🔍 Advanced Filtering Options", expanded=False):
-        active_filters = render_advanced_filters(st.session_state.db)
-    
-    # Live Search Logic
-    # 1. Get IDs from quick select/custom
-    quick_ids = [str(s) for s in selected_popular]
-    if custom_input:
-        quick_ids.extend([x.strip() for x in custom_input.split(',') if x.strip()])
-    
-    # 2. Get satellites from DB based on quick IDs
-    quick_results = []
-    for qid in quick_ids:
-        res = st.session_state.db.search_satellites(query=qid, limit=1)
+    # Get satellites for selection
+    st.session_state.filtering_results = []
+    for ident in identifiers:
+        res = st.session_state.db.search_satellites(query=ident, limit=1)
         if res:
-            quick_results.extend(res)
-    
-    # 3. Get satellites from advanced filters
-    advanced_results = []
-    if any(active_filters.values()):
-        advanced_results = st.session_state.db.search_satellites(
-            query=active_filters.get("query"),
-            country=active_filters.get("country"),
-            object_type=active_filters.get("object_type"),
-            orbit_type=active_filters.get("orbit_type"),
-            status=active_filters.get("status"),
-            limit=50
-        )
-    
-    # 4. Combine and unique
-    combined = {s['norad_id']: s for s in quick_results + advanced_results}.values()
-    st.session_state.filtering_results = list(combined)
-    
+            st.session_state.filtering_results.extend(res)
+            
     if st.session_state.filtering_results:
         st.caption(f"Tracking {len(st.session_state.filtering_results)} satellites.")
     

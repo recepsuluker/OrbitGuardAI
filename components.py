@@ -282,36 +282,7 @@ def render_risk_meter(score: float, max_score: float = 10.0, label: str = "Risk 
     """, unsafe_allow_html=True)
 
 
-def render_advanced_filters(db_manager) -> Dict:
-    """Render advanced satellite filtering UI"""
-    st.markdown("### 🔍 Advanced Search")
-    
-    # 1. Fuzzy Search Input
-    query = st.text_input("Search (Name or NORAD ID)", placeholder='e.g. "ISS" or "25544"', key="filter_query")
-    
-    # Get all countries and types from DB for dropdowns
-    stats = db_manager.get_statistics()
-    all_countries = [c['country'] for c in stats.get('top_countries', [])]
-    countries = ["All"] + sorted(all_countries)
-    
-    obj_types = ["All"] + sorted([t['object_type'] for t in stats.get('object_types', []) if t['object_type']])
-    
-    # 2. Filter Grid
-    col1, col2 = st.columns(2)
-    with col1:
-        orbit = st.selectbox("Orbit Type", ["All", "LEO", "MEO", "GEO", "HEO"], key="filter_orbit")
-        status = st.selectbox("Status", ["All", "Active", "Inactive"], key="filter_status")
-    with col2:
-        country = st.selectbox("Country", countries, key="filter_country")
-        obj_type = st.selectbox("Object Type", obj_types, key="filter_type")
-        
-    return {
-        "query": query if query else None,
-        "orbit_type": orbit if orbit != "All" else None,
-        "status": status if status != "All" else None,
-        "country": country if country != "All" else None,
-        "object_type": obj_type if obj_type != "All" else None,
-    }
+
 
 
 def render_data_table(df: pd.DataFrame, title: str = None):
