@@ -186,18 +186,20 @@ class DatabaseManager:
         query: Optional[str] = None,
         country: Optional[str] = None,
         object_type: Optional[str] = None,
-        active_only: bool = True,
+        orbit_type: Optional[str] = None,
+        status: Optional[str] = None,
         limit: int = 100,
         offset: int = 0
     ) -> List[Dict]:
         """
-        Search satellites with filters.
+        Search satellites with advanced filters.
         
         Args:
             query: Search term (name or NORAD ID)
             country: Filter by country
-            object_type: Filter by object type
-            active_only: Only return active satellites
+            object_type: Filter by object type (PAYLOAD, DEBRIS, etc.)
+            orbit_type: LEO, MEO, GEO, HEO
+            status: Active, Inactive
             limit: Maximum results
             offset: Pagination offset
             
@@ -211,27 +213,78 @@ class DatabaseManager:
         params = []
         
         if query:
-            sql += ' AND (object_name LIKE ? OR CAST(norad_id AS TEXT) LIKE ?)'
-            params.extend([f'%{query}%', f'%{query}%'])
+            # Check if query is numeric (NORAD ID)
+            if query.isdigit():
+                sql += ' AND norad_id = ?'
+                params.append(int(query))
+            else:
+                sql += ' AND object_name LIKE ?'
+                params.append(f'%{query}%')
         
-        if country:
+        if country and country != "All":
             sql += ' AND country = ?'
             params.append(country)
         
-        if object_type:
+        if object_type and object_type != "All":
             sql += ' AND object_type = ?'
             params.append(object_type)
+            
+        if status:
+            if status == "Active":
+                # Definition of active: is_active=1 AND epoch within last 30 days
+                thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
+                sql += ' AND is_active = 1 AND epoch > ?'
+                params.append(thirty_days_ago)
+            elif status == "Inactive":
+                sql += ' AND is_active = 0'
         
-        if active_only:
-            sql += ' AND is_active = 1'
+        if orbit_type:
+            # Mean Motion thresholds:
+            # LEO: > 11.25 rad/day (period < 128 min)
+            # GEO: ~ 1.0027 rad/day (period ~ 24h)
+            # MEO: 1.0027 < MM < 11.25
+            if orbit_type == "LEO":
+                sql += ' AND mean_motion > 11.25'
+            elif orbit_type == "GEO":
+                sql += ' AND mean_motion >= 0.99 AND mean_motion <= 1.01 AND eccentricity < 0.01'
+            elif orbit_type == "MEO":
+                sql += ' AND mean_motion > 1.01 AND mean_motion <= 11.25'
+            elif orbit_type == "HEO":
+                sql += ' AND eccentricity > 0.5'
         
         sql += ' ORDER BY object_name LIMIT ? OFFSET ?'
         params.extend([limit, offset])
         
         cursor.execute(sql, params)
         rows = cursor.fetchall()
+        results = [dict(row) for row in rows]
         
-        return [dict(row) for row in rows]
+        # Apply fuzzy search if query is provided and it's not a NORAD ID
+        if query and not query.isdigit():
+            try:
+                from thefuzz import process
+                # Extract names for fuzzy matching
+                names = [r['object_name'] for r in results]
+                fuzzy_matches = process.extract(query, names, limit=limit)
+                
+                # Rebuild results based on fuzzy scores
+                # Only keep matches with a decent score (>60)
+                filtered_results = []
+                # Map names back to objects
+                name_map = {r['object_name']: r for r in results}
+                
+                for name, score in fuzzy_matches:
+                    if score > 60:
+                        filtered_results.append(name_map[name])
+                
+                return filtered_results
+                
+            except ImportError:
+                # Fallback to standard results if thefuzz is not installed
+                logger.warning("thefuzz not found, using SQL LIKE results")
+                return results
+                
+        return results
     
     def get_all_norad_ids(self) -> List[int]:
         """Get list of all NORAD IDs in database."""

@@ -13,8 +13,9 @@ from components import (
     render_header, render_stats_bar, render_view_toggle, render_login_button,
     render_satellite_card, render_conjunction_alert, render_theme_selector,
     render_loading_animation, render_empty_state, render_risk_meter,
-    render_download_buttons
+    render_download_buttons, render_advanced_filters
 )
+from database_manager import DatabaseManager
 from skyfield.api import wgs84, load
 import streamlit.components.v1 as components
 import pandas as pd
@@ -48,6 +49,10 @@ if 'satellites' not in st.session_state:
     st.session_state.satellites = []
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
+if 'db' not in st.session_state:
+    st.session_state.db = DatabaseManager()
+if 'filtering_results' not in st.session_state:
+    st.session_state.filtering_results = []
 
 # =============================================================================
 # Theme Injection
@@ -220,32 +225,24 @@ with st.sidebar:
     
     st.divider()
     
-    # Satellite Selection
-    st.markdown("### 🛰️ Satellites")
+    # Advanced Filtering
+    active_filters = render_advanced_filters(st.session_state.db)
     
-    popular_sats = [
-        "ISS (ZARYA)", "HST", "TIANGONG", "CSS (TIANHE)",
-        "STARLINK-1007", "STARLINK-1008", "NOAA 19", "METOP-B",
-        "SENTINEL-1A", "SENTINEL-2A", "LANDSAT 8", "LANDSAT 9"
-    ]
-    
-    selected_sats = st.multiselect(
-        "Select from catalog",
-        options=popular_sats,
-        default=["ISS (ZARYA)", "HST"],
-        key="sat_select"
-    )
-    
-    custom_sats = st.text_input(
-        "Add custom (comma-separated)",
-        placeholder="25544, STARLINK-1234",
-        key="custom_sats"
-    )
-    
-    # Combine selections
-    identifiers = selected_sats.copy()
-    if custom_sats:
-        identifiers.extend([x.strip() for x in custom_sats.split(',') if x.strip()])
+    # Live Search Result Update
+    if any(active_filters.values()):
+        st.session_state.filtering_results = st.session_state.db.search_satellites(
+            query=active_filters.get("query"),
+            country=active_filters.get("country"),
+            object_type=active_filters.get("object_type"),
+            orbit_type=active_filters.get("orbit_type"),
+            status=active_filters.get("status"),
+            limit=50
+        )
+    else:
+        st.session_state.filtering_results = []
+        
+    if st.session_state.filtering_results:
+        st.caption(f"Found {len(st.session_state.filtering_results)} satellites matching filters.")
     
     st.divider()
     
@@ -308,8 +305,8 @@ if st.session_state.analysis_complete and st.session_state.satellites:
     })
 else:
     render_stats_bar({
-        "Tracked Satellites": len(identifiers),
-        "Status": "Ready",
+        "Matching Filters": len(st.session_state.filtering_results) if st.session_state.filtering_results else 0,
+        "Status": "Ready for Analysis",
         "Ground Station": f"{lat:.2f}°, {lon:.2f}°",
         "Threshold": f"{collision_threshold} km"
     })
@@ -379,16 +376,21 @@ st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 # =============================================================================
 
 if run_analysis:
-    if len(identifiers) < 2:
-        st.error("⚠️ Please select at least 2 satellites for analysis.")
+    # Use filtered results or popular defaults if none
+    target_satellites = st.session_state.filtering_results
+    
+    if not target_satellites:
+        st.warning("⚠️ No satellites selected. Please use filters to find satellites for analysis.")
     else:
+        # Extract identifiers for OrbitAgent
+        tle_identifiers = [str(s['norad_id']) for s in target_satellites]
         with st.spinner("🛰️ Fetching satellite data and computing analysis..."):
             try:
                 # Initialize agent
                 agent = OrbitGuardAI(threshold_km=collision_threshold)
                 
                 # Fetch TLEs
-                agent.fetch_tles(username, password, identifiers)
+                agent.fetch_tles(username, password, tle_identifiers)
                 
                 # Set ground station
                 agent.observer_lat = lat

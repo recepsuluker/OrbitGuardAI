@@ -259,6 +259,97 @@ def render_risk_meter(score: float, max_score: float = 10.0, label: str = "Risk 
     """, unsafe_allow_html=True)
 
 
+def render_advanced_filters(db_manager) -> Dict:
+    """Render advanced satellite filtering UI"""
+    st.markdown("### 🔍 Advanced Search")
+    
+    # 1. Fuzzy Search Input
+    query = st.text_input("Search (Name or NORAD ID)", placeholder='e.g. "ISS" or "25544"', key="filter_query")
+    
+    # Get unique countries and types from DB for dropdowns
+    stats = db_manager.get_statistics()
+    top_countries = [c['country'] for c in stats.get('top_countries', [])]
+    countries = ["All"] + sorted(top_countries)
+    
+    obj_types = ["All"] + [t['object_type'] for t in stats.get('object_types', []) if t['object_type']]
+    
+    # 2. Filter Grid
+    col1, col2 = st.columns(2)
+    with col1:
+        orbit = st.selectbox("Orbit Type", ["All", "LEO", "MEO", "GEO", "HEO"], key="filter_orbit")
+        status = st.selectbox("Status", ["All", "Active", "Inactive"], key="filter_status")
+    with col2:
+        country = st.selectbox("Country", countries, key="filter_country")
+        obj_type = st.selectbox("Object Type", obj_types, key="filter_type")
+        
+    # 3. Saved Filters Logic
+    st.markdown("---")
+    render_saved_filters_management()
+    
+    return {
+        "query": query if query else None,
+        "orbit_type": orbit if orbit != "All" else None,
+        "status": status if status != "All" else None,
+        "country": country if country != "All" else None,
+        "object_type": obj_type if obj_type != "All" else None,
+    }
+
+def render_saved_filters_management():
+    """UI for saving and loading filter presets"""
+    import json
+    import os
+    
+    SAVED_FILTERS_FILE = "saved_filters.json"
+    
+    # Load existing filters
+    saved_presets = {}
+    if os.path.exists(SAVED_FILTERS_FILE):
+        try:
+            with open(SAVED_FILTERS_FILE, 'r') as f:
+                saved_presets = json.load(f)
+        except:
+            saved_presets = {}
+            
+    with st.expander("💾 Saved Filters", expanded=False):
+        # Save current filter
+        new_preset_name = st.text_input("Save current filters as:", placeholder="e.g. 'Active USA LEO'")
+        if st.button("Save Preset") and new_preset_name:
+            current_filters = {
+                "query": st.session_state.get("filter_query"),
+                "orbit_type": st.session_state.get("filter_orbit"),
+                "status": st.session_state.get("filter_status"),
+                "country": st.session_state.get("filter_country"),
+                "object_type": st.session_state.get("filter_type")
+            }
+            saved_presets[new_preset_name] = current_filters
+            with open(SAVED_FILTERS_FILE, 'w') as f:
+                json.dump(saved_presets, f)
+            st.success(f"Preset '{new_preset_name}' saved!")
+            st.rerun()
+            
+        if saved_presets:
+            st.divider()
+            selected_preset = st.selectbox("Load Preset", options=["Select..."] + list(saved_presets.keys()))
+            if selected_preset != "Select...":
+                preset_data = saved_presets[selected_preset]
+                # Apply preset to session state
+                st.session_state.filter_query = preset_data.get("query", "")
+                st.session_state.filter_orbit = preset_data.get("orbit_type", "All")
+                st.session_state.filter_status = preset_data.get("status", "All")
+                st.session_state.filter_country = preset_data.get("country", "All")
+                st.session_state.filter_type = preset_data.get("object_type", "All")
+                st.info(f"Loaded '{selected_preset}'. Click apply to use.")
+                if st.button("Apply Preset"):
+                    st.rerun()
+            
+            # Delete preset
+            if selected_preset != "Select..." and st.button("🗑️ Delete Preset", type="secondary"):
+                del saved_presets[selected_preset]
+                with open(SAVED_FILTERS_FILE, 'w') as f:
+                    json.dump(saved_presets, f)
+                st.rerun()
+
+
 def render_data_table(df: pd.DataFrame, title: str = None):
     """Render a styled data table"""
     if title:
@@ -283,5 +374,5 @@ def render_download_buttons(data_dict: Dict[str, pd.DataFrame]):
                 data=csv,
                 file_name=f"{name.lower().replace(' ', '_')}.csv",
                 mime="text/csv",
-                width="stretch"
+                key=f"dl_{name.lower().replace(' ', '_')}"
             )
