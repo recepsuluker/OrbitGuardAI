@@ -209,17 +209,21 @@ with st.sidebar:
     st.divider()
     
     # Credentials
-    with st.expander("🔐 Space-Track Credentials", expanded=False):
+    with st.expander("🔐 Space-Track Credentials", expanded=not st.session_state.get('logged_in', False)):
         username = st.text_input("Username", value="", key="st_user")
         password = st.text_input("Password", type="password", value="", key="st_pass")
         
         # Login button
         if render_login_button():
             if username and password:
-                st.success("✅ Logged in successfully!")
+                # Test login could be added here, but for now we trust and use during fetch
+                st.success("✅ Credentials recorded!")
                 st.session_state['logged_in'] = True
+                st.session_state['username'] = username
+                st.session_state['password'] = password
             else:
                 st.error("⚠️ Please enter both username and password")
+                st.session_state['logged_in'] = False
         
         st.caption("📡 [Register at space-track.org](https://www.space-track.org)")
     
@@ -244,20 +248,18 @@ with st.sidebar:
         help="Comma-separated NORAD IDs"
     )
     
-    # Process identifiers
+    # Process identifiers - store them directly for live fetching
     identifiers = [s for s in selected_sats]
     if custom_ids:
         identifiers.extend([i.strip() for i in custom_ids.split(",") if i.strip()])
     
-    # Get satellites for selection
-    st.session_state.filtering_results = []
-    for ident in identifiers:
-        res = st.session_state.db.search_satellites(query=ident, limit=1)
-        if res:
-            st.session_state.filtering_results.extend(res)
+    # Store identifiers in session state for analysis run
+    st.session_state.target_identifiers = identifiers
             
-    if st.session_state.filtering_results:
-        st.caption(f"Tracking {len(st.session_state.filtering_results)} satellites.")
+    if identifiers:
+        st.caption(f"Ready to track {len(identifiers)} satellites (Live from Space-Track).")
+    else:
+        st.caption("Select satellites to begin live tracking.")
     
     st.divider()
     
@@ -385,21 +387,26 @@ st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 # =============================================================================
 
 if run_analysis:
-    # Use filtered results or popular defaults if none
-    target_satellites = st.session_state.filtering_results
+    # Use identifiers stored in session state
+    target_identifiers = st.session_state.get('target_identifiers', [])
+    is_logged_in = st.session_state.get('logged_in', False)
     
-    if not target_satellites:
-        st.warning("⚠️ No satellites selected. Please use filters to find satellites for analysis.")
+    if not is_logged_in:
+        st.error("🔒 **Authentication Required**: Please enter your Space-Track credentials in the sidebar to run live analysis.")
+    elif not target_identifiers:
+        st.warning("⚠️ No satellites selected. Please select from the list or enter NORAD IDs.")
     else:
-        # Extract identifiers for OrbitAgent
-        tle_identifiers = [str(s['norad_id']) for s in target_satellites]
-        with st.spinner("🛰️ Fetching satellite data and computing analysis..."):
+        with st.spinner("🛰️ Fetching live data from Space-Track and computing analysis..."):
             try:
                 # Initialize agent
                 agent = OrbitGuardAI(threshold_km=collision_threshold)
                 
-                # Fetch TLEs
-                agent.fetch_tles(username, password, tle_identifiers)
+                # Fetch TLEs live
+                agent.fetch_tles(
+                    st.session_state.get('username'), 
+                    st.session_state.get('password'), 
+                    target_identifiers
+                )
                 
                 # Set ground station
                 agent.observer_lat = lat
