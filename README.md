@@ -20,14 +20,14 @@
 
 ## 🌟 Highlights
 
-OrbitGuard AI is a **high-performance** satellite tracking and monitoring platform with:
+**OrbitGuard AI** is an intelligent satellite monitoring agent that detects close encounters between satellites, calculates visibility from custom base stations, and visualizes orbits in interactive 2D and 3D maps using **real-time TLE data** directly from Space-Track.org.
 
-🚀 **Real-time TLE Data** - Automatic retrieval from [Space-Track.org](https://www.space-track.org)  
-⚠️ **Collision Detection** - Advanced proximity analysis between satellites  
-📡 **Visibility Predictions** - Ground station pass forecasting  
-🗺️ **Interactive Visualization** - 2D (Folium) and 3D (Plotly) globe views  
-📊 **Performance Optimized** - Redis caching, async processing, Rust engine  
-💾 **Data Export** - CSV and HTML reports for post-analysis
+🚀 **Exclusive Live Data** - Fetched on-demand from Space-Track's latest `gp` API.  
+⚠️ **Collision Detection** - Real-time proximity analysis and risk scoring.  
+📡 **Visibility Predictions** - Accurate ground station pass forecasting.  
+🌍 **Interactive 3D Globe** - High-performance Three.js visualization.  
+🎨 **Premium UI** - Centered design with modern aesthetic and theme support.  
+🔐 **Secure Access** - Mandatory Space-Track authentication for all analysis runs.
 
 ---
 
@@ -37,13 +37,13 @@ OrbitGuard AI is a **high-performance** satellite tracking and monitoring platfo
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| 🛰️ **TLE Retrieval** | Automatic satellite data fetching from Space-Track.org | ✅ Active |
+| 🛰️ **Live TLE Fetching** | Real-time data from Space-Track.org (GP Class) | ✅ NEW |
 | ⚠️ **Conjunction Analysis** | Satellite-to-satellite close approach detection | ✅ Active |
 | 📡 **Visibility Passes** | Ground station visibility predictions | ✅ Active |
-| 🗺️ **2D Visualization** | Interactive Folium maps with satellite tracks | ✅ Active |
-| 🌍 **3D Globe** | Three.js + Plotly 3D Earth visualization | ✅ Active |
-| 📊 **CSV/HTML Export** | Downloadable analysis reports | ✅ Active |
-| 🎨 **Theme System** | Nadir.space, Dracula, Solarized & Custom Builder | ✅ NEW |
+| 🗺️ **2D/3D Visualization** | Interactive maps and high-fidelity 3D globe | ✅ Polished |
+| 🔐 **Auth-Protected** | Mandatory login for live data streams | ✅ Active |
+| 📊 **CSV/HTML Export** | Downloadable mission-critical reports | ✅ Active |
+| 🎨 **Theme System** | Nadir.space, Dracula, and Light Mode support | ✅ Updated |
 
 ### 🔥 Performance Optimization (Step 1) ✅
 
