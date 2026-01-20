@@ -25,6 +25,7 @@ from folium.plugins import MarkerCluster
 import pydeck as pdk
 import os
 import requests
+from collision_watch import CollisionWatchEngine, WatchlistManager
 
 # =============================================================================
 # Page Configuration
@@ -40,7 +41,7 @@ st.set_page_config(
 # Session State Initialization
 # =============================================================================
 if 'theme' not in st.session_state:
-    st.session_state.theme = "light"  # Default to Light theme per request
+    st.session_state.theme = "elegant"  # Default to Elegant theme (DIREM style)
 if 'custom_theme_data' not in st.session_state:
     st.session_state.custom_theme_data = None
 if 'view_mode' not in st.session_state:
@@ -49,10 +50,14 @@ if 'satellites' not in st.session_state:
     st.session_state.satellites = []
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
-if 'db' not in st.session_state:
-    st.session_state.db = DatabaseManager()
 if 'filtering_results' not in st.session_state:
     st.session_state.filtering_results = []
+if 'watchlist_manager' not in st.session_state:
+    st.session_state.watchlist_manager = WatchlistManager()
+if 'collision_watch_engine' not in st.session_state:
+    st.session_state.collision_watch_engine = CollisionWatchEngine()
+if 'watchlist_events' not in st.session_state:
+    st.session_state.watchlist_events = []
 
 # =============================================================================
 # Theme Injection
@@ -130,7 +135,7 @@ def create_2d_map(satellites_data, ground_station=None, theme="dark"):
             folium.PolyLine(
                 locations=sat['path'],
                 weight=2,
-                color='#00d4ff',
+                color='#C4927A',  # Matching elegant rose accent
                 opacity=0.6
             ).add_to(m)
     
@@ -304,6 +309,34 @@ with st.sidebar:
         lat = st.number_input("Latitude", value=41.0082, key="lat")
         lon = st.number_input("Longitude", value=28.9784, key="lon")
         elev = st.number_input("Elevation (m)", value=100, key="elev")
+    
+    st.divider()
+    
+    # Watchlist Management
+    st.markdown("### 📋 Watchlist")
+    watchlist = st.session_state.watchlist_manager.get_watchlist()
+
+    # Add to watchlist from sidebar
+    with st.container():
+        col_w1, col_w2 = st.columns([3, 1])
+        with col_w1:
+            new_sat = st.text_input("Follow ID/Name", value="", key="new_watchlist_sat", label_visibility="collapsed", placeholder="Enter ID/Name")
+        with col_w2:
+            if st.button("➕", use_container_width=True, help="Follow satellite"):
+                if new_sat:
+                    if st.session_state.watchlist_manager.add_satellite(new_sat):
+                        st.success("Followed!")
+                        st.rerun()
+
+    if watchlist:
+        for ws in watchlist:
+            c1, c2 = st.columns([4, 1])
+            c1.caption(f"📡 {ws}")
+            if c2.button("🗑️", key=f"del_{ws}", help="Unfollow"):
+                st.session_state.watchlist_manager.remove_satellite(ws)
+                st.rerun()
+    else:
+        st.caption("No satellites in watchlist.")
 
 # =============================================================================
 # Main Content
@@ -365,230 +398,290 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# View Toggle - Sleek space style
-st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-view_mode = render_view_toggle(st.session_state.view_mode)
-st.session_state.view_mode = view_mode
+# Main Application Tabs
+# =============================================================================
+tab1, tab2 = st.tabs(["📊 Live Analysis", "🛡️ Collision Watch"])
 
-# Run Analysis Button
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    run_analysis = st.button(
-        "🚀 Run Satellite Analysis",
-        width="stretch",
-        type="primary",
-        key="run_btn"
-    )
+with tab1:
+    # View Toggle - Sleek space style
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    view_mode = render_view_toggle(st.session_state.view_mode)
+    st.session_state.view_mode = view_mode
 
-st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    # Run Analysis Button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        run_analysis = st.button(
+            "🚀 Run Satellite Analysis",
+            width="stretch",
+            type="primary",
+            key="run_btn"
+        )
+
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+    # =============================================================================
+    # Analysis & Visualization
+    # =============================================================================
+
+    if run_analysis:
+        # Use identifiers stored in session state
+        target_identifiers = st.session_state.get('target_identifiers', [])
+        is_logged_in = st.session_state.get('logged_in', False)
+        
+        if not is_logged_in:
+            st.error("🔒 **Authentication Required**: Please enter your Space-Track credentials in the sidebar to run live analysis.")
+        elif not target_identifiers:
+            st.warning("⚠️ No satellites selected. Please select from the list or enter NORAD IDs.")
+        else:
+            with st.spinner("🛰️ Fetching live data from Space-Track and computing analysis..."):
+                try:
+                    # Initialize agent
+                    agent = OrbitGuardAI(threshold_km=collision_threshold)
+                    
+                    # Fetch TLEs live
+                    agent.fetch_tles(
+                        st.session_state.get('username'), 
+                        st.session_state.get('password'), 
+                        target_identifiers
+                    )
+                    
+                    # Set ground station
+                    agent.observer_lat = lat
+                    agent.observer_lon = lon
+                    agent.elevation_m = elev
+                    agent.station = wgs84.latlon(lat, lon, elev)
+                    
+                    # Run analysis
+                    warnings = agent.check_conjunctions()
+                    passes = agent.track_ground_passes()
+                    
+                    # Prepare satellite display data
+                    ts = load.timescale()
+                    t = ts.now()
+                    
+                    satellites_data = []
+                    for sat in agent.satellites:
+                        try:
+                            geocentric = sat.at(t)
+                            subpoint = wgs84.subpoint(geocentric)
+                            
+                            # Calculate proper altitude
+                            position_km = geocentric.position.km
+                            geocentric_distance = np.linalg.norm(position_km)
+                            altitude_km = geocentric_distance - 6371.0
+                            
+                            # Calculate orbit path
+                            path = []
+                            for mins in range(0, 100, 5):
+                                t_path = ts.utc(t.utc_datetime() + pd.Timedelta(minutes=mins))
+                                sp = wgs84.subpoint(sat.at(t_path))
+                                path.append([sp.latitude.degrees, sp.longitude.degrees])
+                            
+                            # Mock criticality for display
+                            crit = np.random.uniform(0, 8)
+                            
+                            satellites_data.append({
+                                'name': sat.name,
+                                'norad_id': sat.model.satnum,
+                                'lat': subpoint.latitude.degrees,
+                                'lon': subpoint.longitude.degrees,
+                                'alt': altitude_km,
+                                'criticality': crit,
+                                'path': path
+                            })
+                        except Exception as e:
+                            continue
+                    
+                    # Store in session
+                    st.session_state.satellites = satellites_data
+                    st.session_state.conjunction_count = len(warnings)
+                    st.session_state.pass_count = len(passes)
+                    st.session_state.warnings = warnings
+                    st.session_state.passes = passes
+                    st.session_state.risk_level = "HIGH" if len(warnings) > 5 else "MEDIUM" if warnings else "LOW"
+                    st.session_state.analysis_complete = True
+                    
+                    st.success(f"✅ Analysis complete! Tracking {len(satellites_data)} satellites.")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Analysis failed: {str(e)}")
+
+    # Display Map
+    if st.session_state.analysis_complete and st.session_state.satellites:
+        
+        ground_station = {'lat': lat, 'lon': lon, 'name': 'Ground Station', 'elev': elev}
+        
+        if st.session_state.view_mode == "2D":
+            # 2D Folium Map
+            st.markdown('<div class="map-container">', unsafe_allow_html=True)
+            map_2d = create_2d_map(
+                st.session_state.satellites,
+                ground_station,
+                st.session_state.theme
+            )
+            map_html = map_2d._repr_html_()
+            components.html(map_html, height=600)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # 3D Three.js Globe
+            st.markdown('<div class="map-container">', unsafe_allow_html=True)
+            globe_html = create_3d_globe_component(
+                st.session_state.satellites,
+                theme=st.session_state.theme
+            )
+            if globe_html:
+                components.html(globe_html, height=650, scrolling=False)
+            else:
+                render_empty_state("No satellite data for 3D visualization")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+        
+        # Results Section
+        col_left, col_right = st.columns([2, 1])
+        
+        with col_left:
+            st.markdown("### 🛰️ Tracked Satellites")
+            
+            for sat in st.session_state.satellites[:10]:
+                status = "critical" if sat.get('criticality', 0) > 5 else "warning" if sat.get('criticality', 0) > 2 else "online"
+                render_satellite_card(
+                    sat['name'],
+                    str(sat.get('norad_id', 'N/A')),
+                    status,
+                    sat['lat'],
+                    sat['lon'],
+                    sat.get('alt', 0)
+                )
+        
+        with col_right:
+            st.markdown("### ⚠️ Conjunction Alerts")
+            warnings = st.session_state.get('warnings', [])
+            if warnings:
+                for w in warnings[:5]:
+                    render_conjunction_alert(
+                        w['satellite_1'],
+                        w['satellite_2'],
+                        w['distance_km'],
+                        w['time_utc']
+                    )
+            else:
+                render_empty_state("No conjunction alerts", "✅")
+            
+            st.markdown("### 📊 Risk Analysis")
+            avg_crit = np.mean([s.get('criticality', 0) for s in st.session_state.satellites]) if st.session_state.satellites else 0
+            render_risk_meter(avg_crit, max_score=10.0, label="Average Criticality")
+        
+        # Export Section
+        st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+        st.divider()
+        st.markdown("### 📥 Export Data")
+        export_col1, export_col2, export_col3 = st.columns(3)
+        
+        with export_col1:
+            sat_df = pd.DataFrame(st.session_state.satellites)
+            st.download_button("📥 Satellite Positions", sat_df.to_csv(index=False), "satellites.csv", "text/csv")
+        
+        with export_col2:
+            if st.session_state.get('warnings'):
+                st.download_button("📥 Conjunction Warnings", pd.DataFrame(st.session_state.warnings).to_csv(index=False), "conjunctions.csv", "text/csv")
+        
+        with export_col3:
+            if st.session_state.get('passes'):
+                st.download_button("📥 Ground Passes", pd.DataFrame(st.session_state.passes).to_csv(index=False), "passes.csv", "text/csv")
+
+    else:
+        # Empty State for Main Analysis (Correctly placed under tab1)
+        render_empty_state(
+            "Select satellites and run analysis to begin tracking",
+            "🛰️"
+        )
 
 # =============================================================================
-# Analysis & Visualization
+# Tab 2: Collision Watch
 # =============================================================================
-
-if run_analysis:
-    # Use identifiers stored in session state
-    target_identifiers = st.session_state.get('target_identifiers', [])
-    is_logged_in = st.session_state.get('logged_in', False)
+with tab2:
+    st.markdown("## 🛡️ Collision Watch - 7 Day Forecast")
+    st.caption("Predictive analysis using J2 secular propagation and Keplerian geometric nodes.")
     
-    if not is_logged_in:
-        st.error("🔒 **Authentication Required**: Please enter your Space-Track credentials in the sidebar to run live analysis.")
-    elif not target_identifiers:
-        st.warning("⚠️ No satellites selected. Please select from the list or enter NORAD IDs.")
-    else:
-        with st.spinner("🛰️ Fetching live data from Space-Track and computing analysis..."):
-            try:
-                # Initialize agent
-                agent = OrbitGuardAI(threshold_km=collision_threshold)
-                
-                # Fetch TLEs live
-                agent.fetch_tles(
-                    st.session_state.get('username'), 
-                    st.session_state.get('password'), 
-                    target_identifiers
-                )
-                
-                # Set ground station
-                agent.observer_lat = lat
-                agent.observer_lon = lon
-                agent.elevation_m = elev
-                agent.station = wgs84.latlon(lat, lon, elev)
-                
-                # Run analysis
-                warnings = agent.check_conjunctions()
-                passes = agent.track_ground_passes()
-                
-                # Prepare satellite display data
-                ts = load.timescale()
-                t = ts.now()
-                
-                satellites_data = []
-                for sat in agent.satellites:
-                    try:
-                        geocentric = sat.at(t)
-                        subpoint = wgs84.subpoint(geocentric)
-                        
-                        # Calculate proper altitude (geocentric distance - Earth radius)
-                        position_km = geocentric.position.km
-                        geocentric_distance = np.linalg.norm(position_km)
-                        altitude_km = geocentric_distance - 6371.0  # Earth radius
-                        
-                        # Calculate orbit path
-                        path = []
-                        for mins in range(0, 100, 5):
-                            t_path = ts.utc(t.utc_datetime() + pd.Timedelta(minutes=mins))
-                            sp = wgs84.subpoint(sat.at(t_path))
-                            path.append([sp.latitude.degrees, sp.longitude.degrees])
-                        
-                        # Mock criticality for display (would come from scientific analysis)
-                        crit = np.random.uniform(0, 8)
-                        
-                        satellites_data.append({
-                            'name': sat.name,
-                            'norad_id': sat.model.satnum,
-                            'lat': subpoint.latitude.degrees,
-                            'lon': subpoint.longitude.degrees,
-                            'alt': altitude_km,
-                            'criticality': crit,
-                            'path': path
-                        })
-                        
-                        print(f"[DEBUG] {sat.name}: Alt={altitude_km:.1f} km, Lat={subpoint.latitude.degrees:.2f}, Lon={subpoint.longitude.degrees:.2f}")
-                    except Exception as e:
-                        print(f"[ERROR] Failed to process satellite: {e}")
-                        continue
-                
-                # Store in session
-                st.session_state.satellites = satellites_data
-                st.session_state.conjunction_count = len(warnings)
-                st.session_state.pass_count = len(passes)
-                st.session_state.warnings = warnings
-                st.session_state.passes = passes
-                st.session_state.risk_level = "HIGH" if len(warnings) > 5 else "MEDIUM" if warnings else "LOW"
-                st.session_state.analysis_complete = True
-                
-                st.success(f"✅ Analysis complete! Tracking {len(satellites_data)} satellites.")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"❌ Analysis failed: {str(e)}")
-
-# Display Map
-if st.session_state.analysis_complete and st.session_state.satellites:
+    # Show which satellites will be analyzed
+    watchlist_sats = st.session_state.watchlist_manager.get_watchlist()
+    selected_sats_for_watch = st.session_state.get('target_identifiers', [])
     
-    ground_station = {'lat': lat, 'lon': lon, 'name': 'Ground Station', 'elev': elev}
+    # Combine both sources (remove duplicates)
+    all_sats_for_watch = list(set(watchlist_sats + selected_sats_for_watch))
     
-    if st.session_state.view_mode == "2D":
-        # 2D Folium Map
-        st.markdown('<div class="map-container">', unsafe_allow_html=True)
-        map_2d = create_2d_map(
-            st.session_state.satellites,
-            ground_station,
-            st.session_state.theme
-        )
-        map_html = map_2d._repr_html_()
-        components.html(map_html, height=600)
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        # 3D Three.js Globe
-        st.markdown('<div class="map-container">', unsafe_allow_html=True)
-        globe_html = create_3d_globe_component(
-            st.session_state.satellites,
-            theme=st.session_state.theme
-        )
-        if globe_html:
-            components.html(globe_html, height=650, scrolling=False)
+    # Display satellite sources
+    col_info1, col_info2 = st.columns(2)
+    with col_info1:
+        st.info(f"📡 **Selected Satellites**: {len(selected_sats_for_watch)}")
+    with col_info2:
+        st.info(f"📋 **Watchlist**: {len(watchlist_sats)}")
+    
+    if all_sats_for_watch:
+        st.caption(f"🔍 Total unique satellites for analysis: **{len(all_sats_for_watch)}**")
+    
+    # Analysis Button
+    col_w_btn1, col_w_btn2 = st.columns([1, 4])
+    run_watch = col_w_btn1.button("🚀 Analyze All Satellites", type="primary", use_container_width=True)
+    
+    if run_watch:
+        if not st.session_state.get('logged_in', False):
+            st.error("🔒 **Authentication Required**: Please login in the sidebar to run predictive analysis.")
+        elif not all_sats_for_watch:
+            st.warning("⚠️ No satellites to analyze. Select satellites from the dropdown or add to your watchlist.")
         else:
-            render_empty_state("No satellite data for 3D visualization")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
-    
-    # Results Section
-    col_left, col_right = st.columns([2, 1])
-    
-    with col_left:
-        st.markdown("### 🛰️ Tracked Satellites")
-        
-        for sat in st.session_state.satellites[:10]:  # Show top 10
-            status = "critical" if sat.get('criticality', 0) > 5 else "warning" if sat.get('criticality', 0) > 2 else "online"
-            render_satellite_card(
-                sat['name'],
-                str(sat.get('norad_id', 'N/A')),
-                status,
-                sat['lat'],
-                sat['lon'],
-                sat.get('alt', 0)
-            )
-        
-        if len(st.session_state.satellites) > 10:
-            st.info(f"+ {len(st.session_state.satellites) - 10} more satellites tracked")
-    
-    with col_right:
-        st.markdown("### ⚠️ Conjunction Alerts")
-        
-        warnings = st.session_state.get('warnings', [])
-        if warnings:
-            for w in warnings[:5]:
-                render_conjunction_alert(
-                    w['satellite_1'],
-                    w['satellite_2'],
-                    w['distance_km'],
-                    w['time_utc']
-                )
-        else:
-            render_empty_state("No conjunction alerts", "✅")
-        
-        st.markdown("### 📊 Risk Analysis")
-        avg_crit = np.mean([s.get('criticality', 0) for s in st.session_state.satellites])
-        render_risk_meter(avg_crit, max_score=10.0, label="Average Criticality")
-    
-    # Export Section
-    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
-    st.divider()
-    
-    st.markdown("### 📥 Export Data")
-    
-    export_col1, export_col2, export_col3 = st.columns(3)
-    
-    with export_col1:
-        sat_df = pd.DataFrame(st.session_state.satellites)
-        st.download_button(
-            "📥 Satellite Positions",
-            sat_df.to_csv(index=False),
-            "satellites.csv",
-            "text/csv",
-            width="stretch"
-        )
-    
-    with export_col2:
-        if st.session_state.get('warnings'):
-            warn_df = pd.DataFrame(st.session_state.warnings)
-            st.download_button(
-                "📥 Conjunction Warnings",
-                warn_df.to_csv(index=False),
-                "conjunctions.csv",
-                "text/csv",
-                width="stretch"
-            )
-    
-    with export_col3:
-        if st.session_state.get('passes'):
-            pass_df = pd.DataFrame(st.session_state.passes)
-            st.download_button(
-                "📥 Ground Passes",
-                pass_df.to_csv(index=False),
-                "passes.csv",
-                "text/csv",
-                width="stretch"
-            )
+            with st.spinner(f"🤖 Analyzing {len(all_sats_for_watch)} satellites for collision risks..."):
+                try:
+                    # Fetch TLEs for ALL satellites (selected + watchlist)
+                    watch_agent = OrbitGuardAI()
+                    watch_agent.fetch_tles(
+                        st.session_state.get('username'),
+                        st.session_state.get('password'),
+                        all_sats_for_watch
+                    )
+                    
+                    # Run predictive analysis
+                    events = st.session_state.collision_watch_engine.predict_collisions(watch_agent.satellites)
+                    st.session_state.watchlist_events = events
+                    
+                    if not events:
+                        st.success(f"✅ No collisions predicted for {len(all_sats_for_watch)} satellites in the next 7 days.")
+                    else:
+                        st.toast(f"🚨 {len(events)} potential events detected!", icon="⚠️")
+                        
+                except Exception as e:
+                    st.error(f"Error during predictive analysis: {e}")
 
-else:
-    # Empty State
-    render_empty_state(
-        "Select satellites and run analysis to begin tracking",
-        "🛰️"
-    )
+    # Display Watchlist Results
+    if st.session_state.watchlist_events:
+        # Dashboard Cards for Critical Risks
+        critical_events = [e for e in st.session_state.watchlist_events if e['Risk Level'] == "CRITICAL"]
+        if critical_events:
+            cols = st.columns(min(len(critical_events), 3))
+            for i, ev in enumerate(critical_events[:3]):
+                with cols[i]:
+                    st.error(f"🚨 **CRITICAL RISK**\nDay {ev['Day']}: {ev['Satellite 1']} vs {ev['Satellite 2']}\nDist: {ev['Distance (km)']} km")
+                    if st.button(f"🔔 Notify Me", key=f"notify_{i}"):
+                        st.toast(f"📧 Notification alert set for {ev['Satellite 1']} conjunction!", icon="✅")
+
+        # Full Table
+        st.markdown("### 📅 Detailed Event Timeline")
+        df_events = pd.DataFrame(st.session_state.watchlist_events)
+        
+        def color_risk(val):
+            if val == 'CRITICAL': return 'background-color: rgba(255, 0, 0, 0.2); color: #FF0000; font-weight: bold;'
+            if val == 'HIGH': return 'background-color: rgba(255, 75, 75, 0.2); color: #FF4B4B;'
+            if val == 'MEDIUM': return 'background-color: rgba(255, 165, 0, 0.2); color: #FFA500;'
+            if val == 'LOW': return 'background-color: rgba(255, 255, 0, 0.2); color: #CCCC00;'
+            return ''
+
+        styled_df = df_events.drop(columns=['Color']).style.applymap(color_risk, subset=['Risk Level'])
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        
+        st.info("💡 **Risk Scoring**: Critical (<0.5km), High (<1.0km), Medium (<2.5km), Low (<5km).")
 
 # =============================================================================
 # Footer

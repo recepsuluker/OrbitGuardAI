@@ -40,7 +40,7 @@ LIGHT_THEME = {
     "border": "rgba(0, 0, 0, 0.1)",
     "shadow": "0 4px 16px rgba(0, 0, 0, 0.1)",
     "glass": "backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);",
-    "glow": "rgba(14, 165, 233, 0.3)",
+    "glow": "rgba(196, 146, 122, 0.2)",
 }
 
 NADIR_THEME = {
@@ -98,7 +98,7 @@ SOLARIZED_DARK = {
     "border": "rgba(131, 148, 150, 0.1)",
     "shadow": "0 8px 32px rgba(0, 0, 0, 0.5)",
     "glass": "backdrop-filter: blur(10px);",
-    "glow": "rgba(38, 139, 210, 0.3)",
+    "glow": "rgba(38, 139, 210, 0.2)",
 }
 
 SOLARIZED_LIGHT = {
@@ -120,7 +120,30 @@ SOLARIZED_LIGHT = {
     "glow": "rgba(38, 139, 210, 0.2)",
 }
 
+# DIREM Silk & Skin inspired elegant theme
+ELEGANT_THEME = {
+    "name": "elegant",
+    "background_primary": "#FAF8F5",  # Warm cream
+    "background_secondary": "#F5F2ED",  # Slightly darker cream
+    "background_card": "rgba(255, 255, 255, 0.95)",
+    "text_primary": "#2D2D2D",  # Dark charcoal
+    "text_secondary": "#6B6B6B",  # Medium gray
+    "accent_primary": "#C4927A",  # Rose/terracotta
+    "accent_secondary": "#A67B5B",  # Warm brown
+    "accent_gradient": "linear-gradient(135deg, #C4927A 0%, #A67B5B 100%)",
+    "success": "#7B9E87",  # Sage green
+    "warning": "#D4A574",  # Warm amber
+    "danger": "#C47070",  # Muted red
+    "border": "rgba(45, 45, 45, 0.08)",
+    "shadow": "0 4px 20px rgba(0, 0, 0, 0.06)",
+    "glass": "backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);",
+    "glow": "rgba(196, 146, 122, 0.25)",
+    "font_heading": "'Playfair Display', serif",
+    "font_body": "'Inter', sans-serif",
+}
+
 THEMES = {
+    "elegant": ELEGANT_THEME,  # New default
     "dark": DARK_THEME,
     "light": LIGHT_THEME,
     "nadir": NADIR_THEME,
@@ -134,8 +157,8 @@ def get_theme_css(theme: dict) -> str:
     """Generate CSS for the selected theme"""
     return f"""
     <style>
-        /* Import Google Fonts */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        /* Import Google Fonts - Including Playfair Display for elegant headings */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap');
         
         /* Root Variables */
         :root {{
@@ -152,13 +175,20 @@ def get_theme_css(theme: dict) -> str:
             --danger: {theme['danger']};
             --border: {theme['border']};
             --shadow: {theme['shadow']};
-            --glow: 0 0 20px {theme['glow']};
+            --glow: {theme['glow']};
         }}
         
         /* Global Styles */
-        .stApp {{
-            background: var(--bg-primary);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        /* Kill the Blue Ghost Vignette - Aggressive */
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {{
+            background: var(--bg-primary) !important;
+            box-shadow: none !important;
+            border: none !important;
+        }}
+        
+        .stApp::before, .stApp::after, [data-testid="stAppViewContainer"]::before, [data-testid="stAppViewContainer"]::after {{
+            display: none !important;
+            content: none !important;
         }}
         
         /* Main Container */
@@ -168,19 +198,32 @@ def get_theme_css(theme: dict) -> str:
             max-width: 100%;
         }}
         
-        /* Headers */
+        /* Headers - Elegant Serif Typography */
         h1, h2, h3, h4, h5, h6 {{
             color: var(--text-primary) !important;
-            font-weight: 600;
+            font-weight: 500;
+            font-family: {theme.get('font_heading', "'Playfair Display', serif")};
+            letter-spacing: -0.02em;
         }}
         
         h1 {{
-            background: var(--accent-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-size: 2.5rem !important;
+            color: var(--text-primary) !important;
+            -webkit-text-fill-color: var(--text-primary) !important;
+            background: none !important;
+            font-size: 2.8rem !important;
+            font-weight: 400 !important;
             margin-bottom: 0.5rem !important;
+            line-height: 1.2 !important;
+        }}
+        
+        h2 {{
+            font-size: 2rem !important;
+            font-weight: 500 !important;
+        }}
+        
+        h3 {{
+            font-size: 1.5rem !important;
+            font-weight: 500 !important;
         }}
         
         /* Paragraphs and Text */
@@ -227,12 +270,27 @@ def get_theme_css(theme: dict) -> str:
             font-weight: 600 !important;
             font-size: 0.95rem !important;
             transition: all 0.3s ease !important;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3) !important;
+            box-shadow: 0 4px 15px var(--glow) !important;
         }}
         
         .stButton > button:hover {{
             transform: translateY(-2px) !important;
-            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4) !important;
+            box-shadow: 0 8px 25px var(--glow) !important;
+        }}
+        
+        /* Remove blue focus outlines from everything */
+        *:focus {{
+            outline: none !important;
+            box-shadow: none !important;
+        }}
+        
+        div[data-baseweb=\"tab\"] {{
+            outline: none !important;
+        }}
+        
+        div[data-baseweb=\"tab\"]:focus {{
+            outline: none !important;
+            box-shadow: none !important;
         }}
         
         /* Secondary Button */
@@ -244,7 +302,7 @@ def get_theme_css(theme: dict) -> str:
         }}
         
         .secondary-btn > button:hover {{
-            background: rgba(0, 212, 255, 0.1) !important;
+            background: rgba(196, 146, 122, 0.1) !important;
         }}
         
         /* Input Fields */
@@ -255,12 +313,13 @@ def get_theme_css(theme: dict) -> str:
             color: var(--text-primary) !important;
             border: 1px solid var(--border) !important;
             border-radius: 10px !important;
+            box-shadow: none !important;
         }}
         
         .stTextInput > div > div > input:focus,
         .stNumberInput > div > div > input:focus {{
             border-color: var(--accent-primary) !important;
-            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2) !important;
+            box-shadow: 0 0 0 2px rgba(196, 146, 122, 0.2) !important;
         }}
         
         /* Multiselect */
@@ -293,6 +352,22 @@ def get_theme_css(theme: dict) -> str:
         .stTabs [aria-selected="true"] {{
             background: var(--accent-gradient) !important;
             color: white !important;
+            border: none !important;
+            box-shadow: none !important;
+        }}
+        
+        /* Remove blue focus outlines from tabs */
+        .stTabs [data-baseweb="tab"]:focus {{
+            outline: none !important;
+            box-shadow: none !important;
+        }}
+        
+        .stTabs [data-baseweb="tab-highlight"] {{
+            background-color: transparent !important;
+        }}
+        
+        .stTabs [data-baseweb="tab-border"] {{
+            background-color: transparent !important;
         }}
         
         /* Metrics */

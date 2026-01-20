@@ -66,12 +66,12 @@ def render_view_toggle(current_view: str = "3D") -> str:
             font-weight: 500 !important;
             transition: all 0.3s ease !important;
         }
-        .stRadio div[role="radiogroup"] label:hover {
+        .stRadio div[role=\"radiogroup\"] label:hover {
             color: #fff !important;
         }
-        .stRadio div[role="radiogroup"] label[data-selected="true"] {
+        .stRadio div[role=\"radiogroup\"] label[data-selected=\"true\"] {
             color: #fff !important;
-            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+            text-shadow: 0 0 10px var(--glow);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -179,6 +179,7 @@ def render_theme_selector():
     st.markdown("### 🎨 Theme Settings")
     
     themes_map = {
+        "Elegant (DIREM)": "elegant",
         "Light Mode": "light",
         "Dark Mode": "dark",
         "Gruvbox": "nadir",
@@ -215,8 +216,9 @@ def render_custom_theme_builder():
         bg = st.color_picker("Background", "#121212")
         text = st.color_picker("Text Color", "#ffffff")
     with col2:
-        accent = st.color_picker("Accent", "#00d4ff")
-        success = st.color_picker("Success/Secondary", "#00ff00")
+        accent = st.color_picker("Accent", "#C4927A")
+        success = st.color_picker("Success/Secondary", "#7B9E87")
+
         
     return create_custom_theme(bg, accent, text, success=success)
 
